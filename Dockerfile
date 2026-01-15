@@ -1,15 +1,26 @@
-FROM schoolofdevops/maven:spring
+# Use Maven official image with JDK
+FROM maven:latest
 
+# Set working directory inside container
 WORKDIR /app
 
-COPY . .
+# Copy your project files to container
+COPY . /app
 
-RUN mvn spring-javaformat:apply && \
-mvn package -DskipTests && \
-mv target/spring-petclinic-2.3.1.BUILD-SNAPSHOT.jar /run/petclinic.jar
+# Run formatter plugins
+RUN mvn net.revelc.code.formatter:formatter-maven-plugin:2.23.0:format && \
+    mvn io.spring.javaformat:spring-javaformat-maven-plugin:0.0.46:apply  \
+    mvn package -DskipTests  \
+    mvn target/spring-petclinic-3.5.0-SNAPSHOT.jar /run/petclinic.jar
 
+# Build the project skipping tests
+#RUN mvn package -DskipTests
+
+# Move the generated jar to /run directory and rename it
+#RUN mv target/spring-petclinic-3.5.0-SNAPSHOT.jar /run/petclinic.jar
+
+# Expose the application port
 EXPOSE 8080
 
-WORKDIR /run
-
-CMD java -jar petclinic.jar
+# Command to run the app jar
+CMD ["java", "-jar", "/run/petclinic.jar"]
