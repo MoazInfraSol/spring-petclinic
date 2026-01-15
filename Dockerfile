@@ -1,26 +1,35 @@
-# Use Maven official image with JDK
-FROM maven:latest
+# ===============================
+# Stage 1: Build the application
+# ===============================
+FROM maven:3.9-eclipse-temurin-17 AS build
 
-# Set working directory inside container
 WORKDIR /app
 
-# Copy your project files to container
-COPY . /app
+# Copy pom.xml first to leverage Docker cache
+COPY pom.xml .
 
-# Run formatter plugins
-RUN mvn net.revelc.code.formatter:formatter-maven-plugin:2.23.0:format && \
-    mvn io.spring.javaformat:spring-javaformat-maven-plugin:0.0.46:apply  \
-    mvn package -DskipTests  \
-    mvn target/spring-petclinic-3.5.0-SNAPSHOT.jar /run/petclinic.jar
+# Download dependencies (offline cache)
+RUN mvn -B dependency:go-offline
 
-# Build the project skipping tests
-#RUN mvn package -DskipTests
+# Copy source code
+COPY src ./src
 
-# Move the generated jar to /run directory and rename it
-#RUN mv target/spring-petclinic-3.5.0-SNAPSHOT.jar /run/petclinic.jar
+# Build the application
+# Skip tests and formatting checks (Docker best practice)
+RUN mvn package -DskipTests -Dspring-javaformat.skip=true
 
-# Expose the application port
+# ===============================
+# Stage 2: Runtime image
+# ===============================
+FROM eclipse-temurin:17-jre
+
+WORKDIR /run
+
+# Copy JAR from build stage
+COPY --from=build /app/target/spring-petclinic-*.jar petclinic.jar
+
+# Expose Spring Boot port
 EXPOSE 8080
 
-# Command to run the app jar
-CMD ["java", "-jar", "/run/petclinic.jar"]
+# Run the application
+ENTRYPOINT ["java", "-jar", "petclinic.jar"]
